@@ -1,9 +1,9 @@
-from enum import Enum
 import ldap
-from ldap.ldapobject import ReconnectLDAPObject
 import srvlookup
-from csh_ldap.member import CSHMember
+from ldap.ldapobject import ReconnectLDAPObject
+
 from csh_ldap.group import CSHGroup
+from csh_ldap.member import CSHMember
 from csh_ldap.utility import reconnect_on_fail
 
 
@@ -11,8 +11,7 @@ class CSHLDAP:
     __domain__ = "csh.rit.edu"
 
     @reconnect_on_fail
-    def __init__(self, bind_dn, bind_pw, *, batch_mods=False,
-                 sasl=False, ro=False):
+    def __init__(self, bind_dn, bind_pw, *, batch_mods=False, sasl=False, ro=False):
         """Handler for bindings to CSH LDAP.
 
         Keyword arguments:
@@ -21,13 +20,15 @@ class CSHLDAP:
         ro -- whether or not CSH LDAP is in read only mode (default False)
         """
         if ro:
-            print("########################################\n"
-                  "#                                      #\n"
-                  "#    CSH LDAP IS IN READ ONLY MODE     #\n"
-                  "#                                      #\n"
-                  "########################################")
+            print(
+                "########################################\n"
+                "#                                      #\n"
+                "#    CSH LDAP IS IN READ ONLY MODE     #\n"
+                "#                                      #\n"
+                "########################################"
+            )
         ldap_srvs = srvlookup.lookup("ldap", "tcp", self.__domain__)
-        self.ldap_uris = ['ldaps://' + uri.hostname for uri in ldap_srvs]
+        self.ldap_uris = ["ldaps://" + uri.hostname for uri in ldap_srvs]
         self.server_uri = None
         self.__con__ = None
         for uri in self.ldap_uris:
@@ -42,7 +43,7 @@ class CSHLDAP:
             raise ldap.SERVER_DOWN
 
         if sasl:
-            self.__con__.sasl_non_interactive_bind_s('')
+            self.__con__.sasl_non_interactive_bind_s("")
         else:
             self.__con__.simple_bind_s(bind_dn, bind_pw)
         self.__mod_queue__ = {}
@@ -76,12 +77,10 @@ class CSHLDAP:
             CSHMember.__ldap_user_ou__,
             ldap.SCOPE_SUBTREE,
             f"(ibutton={val})",
-            ['ipaUniqueID'])
+            ["ipaUniqueID"],
+        )
         if members:
-            return CSHMember(
-                self,
-                members[0][1]['ipaUniqueID'][0].decode('utf-8'),
-                False)
+            return CSHMember(self, members[0][1]["ipaUniqueID"][0].decode("utf-8"), False)
         return None
 
     @reconnect_on_fail
@@ -98,12 +97,10 @@ class CSHLDAP:
             CSHMember.__ldap_user_ou__,
             ldap.SCOPE_SUBTREE,
             f"(slackuid={slack})",
-            ['ipaUniqueID'])
+            ["ipaUniqueID"],
+        )
         if members:
-            return CSHMember(
-                self,
-                members[0][1]['ipaUniqueID'][0].decode('utf-8'),
-                False)
+            return CSHMember(self, members[0][1]["ipaUniqueID"][0].decode("utf-8"), False)
         return None
 
     @reconnect_on_fail
@@ -130,27 +127,20 @@ class CSHLDAP:
 
         __ldap_group_ou__ = "cn=groups,cn=accounts,dc=csh,dc=rit,dc=edu"
 
-        res = self.__con__.search_s(
-            __ldap_group_ou__,
-            ldap.SCOPE_SUBTREE,
-            f"(cn=eboard-{val})",
-            ['member'])
+        res = self.__con__.search_s(__ldap_group_ou__, ldap.SCOPE_SUBTREE, f"(cn=eboard-{val})", ["member"])
 
         ret = []
-        for member in res[0][1]['member']:
+        for member in res[0][1]["member"]:
             try:
-                ret.append(member.decode('utf-8'))
+                ret.append(member.decode("utf-8"))
             except UnicodeDecodeError:
                 ret.append(member)
             except KeyError:
                 continue
 
-        return [CSHMember(self,
-                          dn.split('=')[1].split(',')[0],
-                          True)
-                for dn in ret]
+        return [CSHMember(self, dn.split("=")[1].split(",")[0], True) for dn in ret]
 
-    def get_query_for_groups(self, groups = None, excluded_groups = None):
+    def get_query_for_groups(self, groups=None, excluded_groups=None):
         """Returns the ldap query string to get members in groups but not in others
 
         Argumenets:
@@ -166,8 +156,7 @@ class CSHLDAP:
 
         group_dns = [f"(memberOf=cn={group},cn=groups,cn=accounts,dc=csh,dc=rit,dc=edu)" for group in groups]
         excluded_group_dns = [
-            f"(memberOf=cn={group},cn=groups,cn=accounts,dc=csh,dc=rit,dc=edu)"
-            for group in excluded_groups
+            f"(memberOf=cn={group},cn=groups,cn=accounts,dc=csh,dc=rit,dc=edu)" for group in excluded_groups
         ]
 
         query = ""
@@ -189,8 +178,8 @@ class CSHLDAP:
 
         return query
 
-    def get_group_member_attributes(self, groups = None, excluded_groups = None, attributes = None):
-        """Returns a list of dicts containing all the attributes requested in the groups listed in groups, 
+    def get_group_member_attributes(self, groups=None, excluded_groups=None, attributes=None):
+        """Returns a list of dicts containing all the attributes requested in the groups listed in groups,
             but not in exlcuded_groups
 
         Arguements:
@@ -201,7 +190,7 @@ class CSHLDAP:
 
         # I HATE PYTHON
         if attributes is None:
-            attributes = ['uid']
+            attributes = ["uid"]
 
         if groups is None:
             groups = []
@@ -213,23 +202,24 @@ class CSHLDAP:
             "dc=csh,dc=rit,dc=edu",
             ldap.SCOPE_SUBTREE,
             self.get_query_for_groups(groups=groups, excluded_groups=excluded_groups),
-            attributes)
+            attributes,
+        )
 
         # the rest of this could be one giant list compression but I don't hate you that much so I chose not to
 
         # filter out subgroups, probably the second check all we need
         # but if we used just the second one but the first one was empty that would probably be confusing?
-        byte_result = [member[1] for member in query_result if not member[1] == {} and "cn=users" in member[0]]
+        byte_result = [member[1] for member in query_result if member[1] != {} and "cn=users" in member[0]]
 
         result = []
 
         for byte_member in byte_result:
             # decoding the byte strings
-            result.append({key: value[0].decode('utf-8') for (key, value) in byte_member.items()})
+            result.append({key: value[0].decode("utf-8") for (key, value) in byte_member.items()})
 
         return result
 
-    def get_group_member_uids(self, groups = None, excluded_groups = None):
+    def get_group_member_uids(self, groups=None, excluded_groups=None):
         """Get a list of member uids in a group
 
         Arguements:
@@ -247,15 +237,16 @@ class CSHLDAP:
             "dc=csh,dc=rit,dc=edu",
             ldap.SCOPE_SUBTREE,
             self.get_query_for_groups(groups=groups, excluded_groups=excluded_groups),
-            ['uid'])
+            ["uid"],
+        )
 
         return [
-            member[1]['uid'][0].decode('utf-8')
+            member[1]["uid"][0].decode("utf-8")
             for member in query_result
-            if not member[1] == {} and "cn=users" in member[0]
+            if member[1] != {} and "cn=users" in member[0]
         ]
 
-    def get_group_member_uuids(self, groups = None, excluded_groups = None):
+    def get_group_member_uuids(self, groups=None, excluded_groups=None):
         """Get a list of member uuids in a group (ipaUniqueId)
 
         Arguements:
@@ -273,12 +264,13 @@ class CSHLDAP:
             "dc=csh,dc=rit,dc=edu",
             ldap.SCOPE_SUBTREE,
             self.get_query_for_groups(groups=groups, excluded_groups=excluded_groups),
-            ['ipaUniqueId'])
+            ["ipaUniqueId"],
+        )
 
         return [
-            member[1]['ipaUniqueId'][0].decode('utf-8')
+            member[1]["ipaUniqueId"][0].decode("utf-8")
             for member in query_result
-            if not member[1] == {} and "cn=users" in member[0]
+            if member[1] != {} and "cn=users" in member[0]
         ]
 
     def enqueue_mod(self, dn, mod):

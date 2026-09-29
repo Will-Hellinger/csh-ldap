@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "csh_ldap"
+version = "2.5.8"
+description = "CSH LDAP ORM"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "CSH RTP", email = "rtp@csh.rit.edu" }]
+requires-python = ">=3.10"
+classifiers = [
+    "Natural Language :: English",
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = [
+    "python-ldap==3.4.5",
+    "srvlookup==3.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ComputerScienceHouse/csh-ldap"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.13",
+]
+
+[tool.setuptools]
+packages = ["csh_ldap"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# E/W: pycodestyle, F: pyflakes, N: pep8-naming, PL: pylint
+select = ["E", "W", "F", "N", "PL"]
+ignore = [
+    "F401",     # unused-import
+    "PLW0603",  # global-statement
+    "PLW2901",  # redefined-loop-name (a pylint extension, wasn't enabled before)
+]
+
+[tool.ruff.lint.pylint]
+max-args = 10
+max-returns = 6
+max-branches = 15
+max-statements = 55
+
+[tool.ty.environment]
+extra-paths = ["./csh_ldap"]
+
+[tool.ty.analysis]
+replace-imports-with-any = ["ldap"]

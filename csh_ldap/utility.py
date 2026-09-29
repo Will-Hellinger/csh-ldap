@@ -1,4 +1,5 @@
 from functools import wraps
+
 import ldap
 import srvlookup
 
@@ -27,24 +28,18 @@ def reconnect_on_fail(method):
         max_reconnects = MAX_RECONNECTS
 
         def is_cshldap(arg):
-            return any(
-                filter(
-                    lambda t: t.__name__ == 'CSHLDAP',
-                    type(arg).__mro__
-                )
-            )
-        ldap_obj = next(filter(is_cshldap, method_args)) \
-                   if any(filter(is_cshldap, method_args)) \
-                   else method_args[0].__lib__
+            return any(filter(lambda t: t.__name__ == "CSHLDAP", type(arg).__mro__))
+
+        ldap_obj = (
+            next(filter(is_cshldap, method_args)) if any(filter(is_cshldap, method_args)) else method_args[0].__lib__
+        )
         while max_reconnects:
             try:
                 result = method(*method_args, **method_kwargs)
                 return result
             except (ldap.SERVER_DOWN, ldap.TIMEOUT):
-                ldap_srvs = srvlookup.lookup(
-                    "ldap", "tcp", ldap_obj.__domain__)
-                ldap_obj.ldap_uris = ['ldaps://' + uri.hostname
-                                      for uri in ldap_srvs]
+                ldap_srvs = srvlookup.lookup("ldap", "tcp", ldap_obj.__domain__)
+                ldap_obj.ldap_uris = ["ldaps://" + uri.hostname for uri in ldap_srvs]
 
                 for uri in ldap_obj.ldap_uris:
                     try:

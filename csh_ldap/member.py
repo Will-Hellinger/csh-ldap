@@ -1,4 +1,5 @@
 import ldap
+
 from csh_ldap.utility import reconnect_on_fail
 
 
@@ -15,8 +16,8 @@ class CSHMember:
         search_val -- the uuid (or uid) of the member to bind to
         uid -- whether or not search_val is a uid
         """
-        self.__dict__['__lib__'] = lib
-        self.__dict__['__con__'] = lib.get_con()
+        self.__dict__["__lib__"] = lib
+        self.__dict__["__con__"] = lib.get_con()
 
         res = None
 
@@ -25,16 +26,18 @@ class CSHMember:
                 self.__ldap_user_ou__,
                 ldap.SCOPE_SUBTREE,
                 f"(uid={search_val})",
-                ['ipaUniqueID'])
+                ["ipaUniqueID"],
+            )
         else:
             res = self.__con__.search_s(
                 self.__ldap_user_ou__,
                 ldap.SCOPE_SUBTREE,
                 f"(ipaUniqueID={search_val})",
-                ['uid'])
+                ["uid"],
+            )
 
         if res:
-            self.__dict__['__dn__'] = res[0][0]
+            self.__dict__["__dn__"] = res[0][0]
         else:
             raise KeyError("Invalid Search Name")
 
@@ -44,13 +47,11 @@ class CSHMember:
         return False
 
     def __hash__(self):
-        """Generate a unique hash value for the bound CSH LDAP member object.
-        """
+        """Generate a unique hash value for the bound CSH LDAP member object."""
         return hash(self.__dn__)
 
     def __repr__(self):
-        """Generate a str representation of the bound CSH LDAP member object.
-        """
+        """Generate a str representation of the bound CSH LDAP member object."""
         return f"CSH Member(dn: {self.__dn__})"
 
     def get(self, key):
@@ -59,7 +60,7 @@ class CSHMember:
         Arguments:
         key -- the attribute to get the value of
         """
-        return self.__getattr__(key, as_list=True) # pylint: disable=unnecessary-dunder-call
+        return self.__getattr__(key, as_list=True)  # pylint: disable=unnecessary-dunder-call
 
     @reconnect_on_fail
     def groups(self):
@@ -67,7 +68,7 @@ class CSHMember:
         is in.
         """
         group_list = []
-        all_groups = self.get('memberof')
+        all_groups = self.get("memberof")
         for group_dn in all_groups:
             if self.__ldap_group_ou__ in group_dn:
                 group_list.append(group_dn)
@@ -92,17 +93,13 @@ class CSHMember:
 
     @reconnect_on_fail
     def __getattr__(self, key, as_list=False):
-        res = self.__con__.search_s(
-            self.__dn__,
-            ldap.SCOPE_BASE,
-            "(objectClass=*)",
-            [key])
+        res = self.__con__.search_s(self.__dn__, ldap.SCOPE_BASE, "(objectClass=*)", [key])
 
         if as_list:
             ret = []
             for val in res[0][1][key]:
                 try:
-                    ret.append(val.decode('utf-8'))
+                    ret.append(val.decode("utf-8"))
                 except UnicodeDecodeError:
                     ret.append(val)
                 except KeyError:
@@ -110,7 +107,7 @@ class CSHMember:
 
             return ret
         try:
-            return res[0][1][key][0].decode('utf-8')
+            return res[0][1][key][0].decode("utf-8")
         except UnicodeDecodeError:
             return res[0][1][key][0]
         except KeyError:
@@ -120,11 +117,7 @@ class CSHMember:
     def __setattr__(self, key, value):
         ldap_mod = None
 
-        exists = self.__con__.search_s(
-            self.__dn__,
-            ldap.SCOPE_BASE,
-            "(objectClass=*)",
-            [key])
+        exists = self.__con__.search_s(self.__dn__, ldap.SCOPE_BASE, "(objectClass=*)", [key])
 
         if value is None or value == "":
             ldap_mod = ldap.MOD_DELETE
@@ -139,7 +132,7 @@ class CSHMember:
         if value is None:
             mod = (ldap_mod, key, None)
         else:
-            mod = (ldap_mod, key, value.encode('utf-8'))
+            mod = (ldap_mod, key, value.encode("utf-8"))
 
         if self.__lib__.__batch_mods__:
             self.__lib__.enqueue_mod(self.__dn__, mod)
