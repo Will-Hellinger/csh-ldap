@@ -1,4 +1,5 @@
 import ldap
+from ldap.filter import escape_filter_chars
 
 from csh_ldap.member import CSHMember
 from csh_ldap.utility import reconnect_on_fail
@@ -60,6 +61,14 @@ class CSHGroup:
 
         return [CSHMember(self.__lib__, result, uid=True) for result in uids]
 
+    @staticmethod
+    def _member_dn(member, dn):
+        """
+        Return the distinguished name for a CSHMember object, or member itself if dn is set.
+        """
+
+        return member if dn else member.get_dn()
+
     @reconnect_on_fail
     def check_member(self, member, dn=False):
         """Check if a Member is in the bound group.
@@ -72,15 +81,12 @@ class CSHGroup:
         dn -- whether or not member is a distinguished name
         """
 
-        if dn:
-            res = self.__con__.search_s(self.__dn__, ldap.SCOPE_BASE, f"(member={dn})", ["ipaUniqueID"])
-        else:
-            res = self.__con__.search_s(
-                self.__dn__,
-                ldap.SCOPE_BASE,
-                f"(member={member.get_dn()})",
-                ["ipaUniqueID"],
-            )
+        member_dn = self._member_dn(member, dn)
+
+        res = self.__con__.search_s(
+            self.__dn__, ldap.SCOPE_BASE, f"(member={escape_filter_chars(member_dn)})", ["ipaUniqueID"]
+        )
+
         return len(res) > 0
 
     @reconnect_on_fail
@@ -94,14 +100,10 @@ class CSHGroup:
         dn -- whether or not member is a distinguished name
         """
 
-        if dn:
-            if self.check_member(member, dn=True):
-                return
-            mod = (ldap.MOD_ADD, "member", member.encode("ascii"))
-        else:
-            if self.check_member(member):
-                return
-            mod = (ldap.MOD_ADD, "member", member.get_dn().encode("ascii"))
+        if self.check_member(member, dn=dn):
+            return
+
+        mod = (ldap.MOD_ADD, "member", self._member_dn(member, dn).encode("utf-8"))
 
         if self.__lib__.__batch_mods__:
             self.__lib__.enqueue_mod(self.__dn__, mod)
@@ -122,14 +124,10 @@ class CSHGroup:
         dn -- whether or not member is a distinguished name
         """
 
-        if dn:
-            if not self.check_member(member, dn=True):
-                return
-            mod = (ldap.MOD_DELETE, "member", member.encode("ascii"))
-        else:
-            if not self.check_member(member):
-                return
-            mod = (ldap.MOD_DELETE, "member", member.get_dn().encode("ascii"))
+        if not self.check_member(member, dn=dn):
+            return
+
+        mod = (ldap.MOD_DELETE, "member", self._member_dn(member, dn).encode("utf-8"))
 
         if self.__lib__.__batch_mods__:
             self.__lib__.enqueue_mod(self.__dn__, mod)

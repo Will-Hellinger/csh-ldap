@@ -4,12 +4,13 @@ from csh_ldap.utility import reconnect_on_fail
 
 
 class CSHMember:
-    __ldap_user_ou__ = "cn=users,cn=accounts,dc=csh,dc=rit,dc=edu"
-    __ldap_group_ou__ = "cn=groups,cn=accounts,dc=csh,dc=rit,dc=edu"
+    __ldap_user_ou__: str = "cn=users,cn=accounts,dc=csh,dc=rit,dc=edu"
+    __ldap_group_ou__: str = "cn=groups,cn=accounts,dc=csh,dc=rit,dc=edu"
 
     @reconnect_on_fail
     def __init__(self, lib, search_val, uid):
-        """Object Model for CSH LDAP users.
+        """
+        Object Model for CSH LDAP users.
 
         Arguments:
         lib -- handle to a CSHLDAP instance
@@ -88,7 +89,10 @@ class CSHMember:
         return group.check_member(self)
 
     def get_dn(self):
-        """Get the distinguished name of the bound LDAP object"""
+        """
+        Get the distinguished name of the bound LDAP object
+        """
+
         return self.__dn__
 
     @reconnect_on_fail

@@ -1,24 +1,25 @@
 import ldap
-import srvlookup
 from ldap.ldapobject import ReconnectLDAPObject
 
 from csh_ldap.group import CSHGroup
 from csh_ldap.member import CSHMember
-from csh_ldap.utility import reconnect_on_fail
+from csh_ldap.utility import lookup_ldap_uris, reconnect_on_fail
 
 
 class CSHLDAP:
-    __domain__ = "csh.rit.edu"
+    __domain__: str = "csh.rit.edu"
 
     @reconnect_on_fail
     def __init__(self, bind_dn, bind_pw, *, batch_mods=False, sasl=False, ro=False):
-        """Handler for bindings to CSH LDAP.
+        """
+        Handler for bindings to CSH LDAP.
 
         Keyword arguments:
         batch_mods -- whether or not to batch LDAP writes (default False)
         sasl -- whether or not to bypass bind_dn and bind_pw and use SASL bind
         ro -- whether or not CSH LDAP is in read only mode (default False)
         """
+
         if ro:
             print(
                 "########################################\n"
@@ -27,25 +28,33 @@ class CSHLDAP:
                 "#                                      #\n"
                 "########################################"
             )
-        ldap_srvs = srvlookup.lookup("ldap", "tcp", self.__domain__)
-        self.ldap_uris = ["ldaps://" + uri.hostname for uri in ldap_srvs]
-        self.server_uri = None
-        self.__con__ = None
+
+        self.ldap_uris: list[str] = lookup_ldap_uris(self.__domain__)
+        self.server_uri: str | None = None
+
+        con: ReconnectLDAPObject | None = None
+
+        # ReconnectLDAPObject() does not touch the network, so a server is only
+        # known to be up once the bind succeeds.
         for uri in self.ldap_uris:
             try:
-                self.__con__ = ReconnectLDAPObject(uri)
+                con = ReconnectLDAPObject(uri)
+                if sasl:
+                    con.sasl_non_interactive_bind_s("")
+                else:
+                    con.simple_bind_s(bind_dn, bind_pw)
                 self.server_uri = uri
                 break
-            except (ldap.SERVER_DOWN, ldap.TIMEOUT):
+            except (ldap.SERVER_DOWN, ldap.TIMEOUT, ldap.CONNECT_ERROR):
+                # CONNECT_ERROR covers per-server TLS failures; try the next server.
+                con = None
                 continue
 
-        if self.__con__ is None:
+        if con is None:
             raise ldap.SERVER_DOWN
 
-        if sasl:
-            self.__con__.sasl_non_interactive_bind_s("")
-        else:
-            self.__con__.simple_bind_s(bind_dn, bind_pw)
+        self.__con__: ReconnectLDAPObject = con
+
         self.__mod_queue__ = {}
         self.__pending_mod_dn__ = []
         self.__batch_mods__ = batch_mods
@@ -178,7 +187,9 @@ class CSHLDAP:
 
         return query
 
-    def get_group_member_attributes(self, groups=None, excluded_groups=None, attributes=None):
+    def get_group_member_attributes(
+        self, groups: list | None = None, excluded_groups: list | None = None, attributes: list | None = None
+    ):
         """Returns a list of dicts containing all the attributes requested in the groups listed in groups,
             but not in exlcuded_groups
 
